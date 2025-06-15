@@ -79,11 +79,52 @@ const TOKEN_B_ADDRESS = "0x95484e9Cd1aEc00376a963b3896F7a23bdc38179";
     setToAmount("");
   };
 
- const handleSwap = async () => {
+const handleSwap = async () => {
   if (!tokenSwapContract || !tokenAContract || !fromAmount) {
     alert("Please connect wallet and enter amount");
     return;
   }
+
+  setIsSwapping(true);
+  try {
+    const amountIn = ethers.parseUnits(fromAmount, 18);
+    const isAtoB = fromToken === "tokenA";
+    const fromContract = isAtoB ? tokenAContract : tokenBContract;
+    const swapMethod = isAtoB ? "swapAForB" : "swapBForA";
+
+    const userAddress = await signer.getAddress();
+    if (!ethers.isAddress(userAddress)) {
+      throw new Error("User wallet address is invalid");
+    }
+
+    if (!ethers.isAddress(TOKEN_SWAP_ADDRESS)) {
+      throw new Error("TokenSwap contract address is invalid");
+    }
+
+    console.log("Approving tokens...");
+    console.log("Contract:", fromContract.target);
+    console.log("To address:", TOKEN_SWAP_ADDRESS);
+
+    const approveTx = await fromContract.approve(TOKEN_SWAP_ADDRESS, amountIn);
+    await approveTx.wait();
+    console.log("Approval successful");
+
+    console.log("Executing swap...");
+    const swapTx = await tokenSwapContract[swapMethod](amountIn);
+    await swapTx.wait();
+    console.log("Swap successful");
+
+    alert("Swap successful!");
+    setFromAmount("");
+    setToAmount("");
+  } catch (err) {
+    console.error("Swap error:", err);
+    alert(`Swap failed: ${err.message || err}`);
+  } finally {
+    setIsSwapping(false);
+  }
+};
+
 
   setIsSwapping(true);
   try {
