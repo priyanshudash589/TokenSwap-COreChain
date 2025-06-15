@@ -41,24 +41,54 @@ export default function TokenSwapDApp() {
   const [exchangeRate] = useState(2450.75); // Mock exchange rate
 
   // Deployed contract addresses
-const TOKEN_SWAP_ADDRESS = "0x5f2f5b8b81b81f59bd22D38a1c24D841fAf517AB8";
-const TOKEN_A_ADDRESS = "0xc97E96D86788ECBD9dc2aFdc24B963A775f020a";
-const TOKEN_B_ADDRESS = "0x95484e9Cd1aEc00376a963b3896F7a23bdc38179";
+  const TOKEN_SWAP_ADDRESS = "0x5f2f5Bb81b81f59bd22D38a1c24D841fAf517AB8";
+  const TOKEN_A_ADDRESS = "0xc97E96D86788ECBD9dc2aF2dC24B936A775f020a";
+  const TOKEN_B_ADDRESS = "0x95484e9dC1aEc00376a963b3896F7a23bdc38179";
+
+  console.log("=== Address Validation ===");
+  console.log(
+    "TOKEN_SWAP_ADDRESS:",
+    TOKEN_SWAP_ADDRESS,
+    "Valid:",
+    ethers.isAddress(TOKEN_SWAP_ADDRESS || "")
+  );
+  console.log(
+    "TOKEN_A_ADDRESS:",
+    TOKEN_A_ADDRESS,
+    "Valid:",
+    ethers.isAddress(TOKEN_A_ADDRESS || "")
+  );
+  console.log(
+    "TOKEN_B_ADDRESS:",
+    TOKEN_B_ADDRESS,
+    "Valid:",
+    ethers.isAddress(TOKEN_B_ADDRESS || "")
+  );
+  console.log("=== ABI Validation ===");
+  console.log("tokenSwapAbi is array:", Array.isArray(tokenSwapAbi));
+  console.log("tokenAbi is array:", Array.isArray(tokenAbi));
+
+  if (!TOKEN_SWAP_ADDRESS || !ethers.isAddress(TOKEN_SWAP_ADDRESS)) {
+    throw new Error(`Invalid contract address: ${TOKEN_SWAP_ADDRESS}`);
+  }
 
   const { signer, address } = useEthers();
 
   // Contract instances with proper error handling
-  const tokenSwapContract = signer && Array.isArray(tokenSwapAbi)
-    ? new ethers.Contract(TOKEN_SWAP_ADDRESS, tokenSwapAbi, signer)
-    : null;
-  
-  const tokenAContract = signer && Array.isArray(tokenAbi)
-    ? new ethers.Contract(TOKEN_A_ADDRESS, tokenAbi, signer)
-    : null;
-  
-  const tokenBContract = signer && Array.isArray(tokenAbi)
-    ? new ethers.Contract(TOKEN_B_ADDRESS, tokenAbi, signer)
-    : null;
+  const tokenSwapContract =
+    signer && Array.isArray(tokenSwapAbi)
+      ? new ethers.Contract(TOKEN_SWAP_ADDRESS, tokenSwapAbi, signer)
+      : null;
+
+  const tokenAContract =
+    signer && Array.isArray(tokenAbi)
+      ? new ethers.Contract(TOKEN_A_ADDRESS, tokenAbi, signer)
+      : null;
+
+  const tokenBContract =
+    signer && Array.isArray(tokenAbi)
+      ? new ethers.Contract(TOKEN_B_ADDRESS, tokenAbi, signer)
+      : null;
 
   const handleFromAmountChange = (value: string) => {
     setFromAmount(value);
@@ -79,84 +109,49 @@ const TOKEN_B_ADDRESS = "0x95484e9Cd1aEc00376a963b3896F7a23bdc38179";
     setToAmount("");
   };
 
-const handleSwap = async () => {
-  if (!tokenSwapContract || !tokenAContract || !fromAmount) {
-    alert("Please connect wallet and enter amount");
-    return;
-  }
-
-  setIsSwapping(true);
-  try {
-    const amountIn = ethers.parseUnits(fromAmount, 18);
-    const isAtoB = fromToken === "tokenA";
-    const fromContract = isAtoB ? tokenAContract : tokenBContract;
-    const swapMethod = isAtoB ? "swapAForB" : "swapBForA";
-
-    const userAddress = await signer.getAddress();
-    if (!ethers.isAddress(userAddress)) {
-      throw new Error("User wallet address is invalid");
+  const handleSwap = async () => {
+    if (!tokenSwapContract || !tokenAContract || !fromAmount) {
+      alert("Please connect wallet and enter amount");
+      return;
     }
 
-    if (!ethers.isAddress(TOKEN_SWAP_ADDRESS)) {
-      throw new Error("TokenSwap contract address is invalid");
+    setIsSwapping(true);
+    try {
+      const amountIn = ethers.parseUnits(fromAmount, 18);
+      const isAtoB = fromToken === "tokenA";
+      const fromContract = isAtoB ? tokenAContract : tokenBContract;
+      const swapMethod = isAtoB ? "swapAForB" : "swapBForA";
+
+      console.log("To address:", TOKEN_SWAP_ADDRESS);
+      if (!ethers.isAddress(TOKEN_SWAP_ADDRESS)) {
+        throw new Error(
+          "Invalid TOKEN_SWAP_ADDRESS: ENS lookup is not supported on this network"
+        );
+      }
+
+      // Approve
+      const approveTx = await fromContract.approve(
+        TOKEN_SWAP_ADDRESS,
+        amountIn
+      );
+      await approveTx.wait();
+      console.log("Approval successful");
+
+      // Swap
+      const swapTx = await tokenSwapContract[swapMethod](amountIn);
+      await swapTx.wait();
+      console.log("Swap successful");
+
+      alert("Swap successful!");
+      setFromAmount("");
+      setToAmount("");
+    } catch (err) {
+      console.error("Swap error:", err);
+      alert(`Swap failed: ${err.message || err}`);
+    } finally {
+      setIsSwapping(false);
     }
-
-    console.log("Approving tokens...");
-    console.log("Contract:", fromContract.target);
-    console.log("To address:", TOKEN_SWAP_ADDRESS);
-
-    const approveTx = await fromContract.approve(TOKEN_SWAP_ADDRESS, amountIn);
-    await approveTx.wait();
-    console.log("Approval successful");
-
-    console.log("Executing swap...");
-    const swapTx = await tokenSwapContract[swapMethod](amountIn);
-    await swapTx.wait();
-    console.log("Swap successful");
-
-    alert("Swap successful!");
-    setFromAmount("");
-    setToAmount("");
-  } catch (err) {
-    console.error("Swap error:", err);
-    alert(`Swap failed: ${err.message || err}`);
-  } finally {
-    setIsSwapping(false);
-  }
-};
-
-
-  setIsSwapping(true);
-  try {
-    const amountIn = ethers.parseUnits(fromAmount, 18);
-
-    const isAtoB = fromToken === "tokenA";
-
-    const fromContract = isAtoB ? tokenAContract : tokenBContract;
-    const swapMethod = isAtoB ? "swapAForB" : "swapBForA";
-
-    // Approve
-    console.log("Approving tokens...");
-    const approveTx = await fromContract.approve(TOKEN_SWAP_ADDRESS, amountIn);
-    await approveTx.wait();
-    console.log("Approval successful");
-
-    // Execute Swap
-    console.log("Executing swap...");
-    const swapTx = await tokenSwapContract[swapMethod](amountIn);
-    await swapTx.wait();
-    console.log("Swap successful");
-
-    alert("Swap successful!");
-    setFromAmount("");
-    setToAmount("");
-  } catch (err) {
-    console.error("Swap error:", err);
-    alert(`Swap failed: ${err.message || err}`);
-  } finally {
-    setIsSwapping(false);
-  }
-};
+  };
 
   const getTokenById = (id: string) => tokens.find((token) => token.id === id);
 
@@ -183,7 +178,9 @@ const handleSwap = async () => {
           variant={isConnected ? "outline" : "default"}
         >
           <Wallet className="w-4 h-4 mr-2" />
-          {isConnected ? `Connected: ${address?.slice(0, 6)}...` : "Connect Wallet"}
+          {isConnected
+            ? `Connected: ${address?.slice(0, 6)}...`
+            : "Connect Wallet"}
         </Button>
       </header>
 
@@ -294,7 +291,12 @@ const handleSwap = async () => {
               {/* Swap Button */}
               <Button
                 onClick={handleSwap}
-                disabled={!isConnected || !fromAmount || isSwapping || !tokenSwapContract}
+                disabled={
+                  !isConnected ||
+                  !fromAmount ||
+                  isSwapping ||
+                  !tokenSwapContract
+                }
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 rounded-2xl text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSwapping ? (
